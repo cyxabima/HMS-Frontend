@@ -15,10 +15,10 @@ export const router = createBrowserRouter([
   },
   {
     path: "/",
-    element: <AuthGuard />, // for all children
+    element: <AuthGuard />, // for all children auth must be check
     children: [
       {
-        index: true, element: <RoleRedirector />
+        index: true, element: <RoleRedirector /> // if someone access / we need mehanism to redirect user based on type
       },
       {
         path: "admin",
