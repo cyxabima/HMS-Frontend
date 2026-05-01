@@ -13,7 +13,6 @@ import { useState } from "react";
 import { ManageTimingsSheet } from "@/components/doctor/doctor-timing-sheet";
 import { OnboardDoctorSheet } from "@/components/doctor/doctor-onboarding-sheet";
 
-// 1. Mapped Types
 interface DoctorTiming {
   id: string;
   day: string;
@@ -27,7 +26,7 @@ interface DoctorTiming {
 
 interface Doctor {
   id: string;
-  name: string; // Joined from users table
+  doctorName: string;
   specialization: string;
   isAvailable: boolean;
   timings: DoctorTiming[];
@@ -38,39 +37,7 @@ interface LoaderData {
   stats: {
     total: number;
     availableNow: number;
-    totalTokensToday: number;
-  };
-}
-
-export async function AdminDoctorLoader(): Promise<LoaderData> {
-  // Mocking the JOIN between users, doctors, and doctor_timings
-  const mockedDoctors: Doctor[] = [
-    {
-      id: "1",
-      name: "Dr. Ayesha Khan",
-      specialization: "Cardiology",
-      isAvailable: true,
-      timings: [{ id: "t1", day: "MONDAY", startTime: "09:00", endTime: "14:00", avgConsultationTime: 15, maxTokens: 20, isActive: true, consultationFee: 3000 }, { id: "t2", day: "TUESDAY", startTime: "10:00", endTime: "16:00", avgConsultationTime: 20, maxTokens: 15, isActive: true, consultationFee: 3000 }, { id: "t3", day: "WEDNESDAY", startTime: "15:00", endTime: "20:00", avgConsultationTime: 10, maxTokens: 30, isActive: true, consultationFee: 3000 }, { id: "t4", day: "MONDAY", startTime: "09:00", endTime: "14:00", avgConsultationTime: 15, maxTokens: 20, isActive: true, consultationFee: 3000 }, { id: "t5", day: "TUESDAY", startTime: "10:00", endTime: "16:00", avgConsultationTime: 20, maxTokens: 15, isActive: true, consultationFee: 3000 }, { id: "t6", day: "WEDNESDAY", startTime: "15:00", endTime: "20:00", avgConsultationTime: 10, maxTokens: 30, isActive: true, consultationFee: 3000 }]
-    },
-    {
-      id: "2",
-      name: "Dr. Salman Ali",
-      specialization: "Orthopedics",
-      isAvailable: false,
-      timings: [{ id: "t2", day: "TUESDAY", startTime: "10:00", endTime: "16:00", avgConsultationTime: 20, maxTokens: 15, isActive: true, consultationFee: 3000 }]
-    },
-    {
-      id: "3",
-      name: "Dr. Fatima Syed",
-      specialization: "Pediatrics",
-      isAvailable: true,
-      timings: [{ id: "t3", day: "WEDNESDAY", startTime: "15:00", endTime: "20:00", avgConsultationTime: 10, maxTokens: 30, isActive: true, consultationFee: 3000 }]
-    },
-  ];
-
-  return {
-    doctors: mockedDoctors,
-    stats: { total: 3, availableNow: 2, totalTokensToday: 65 }
+    shiftsToday: number;
   };
 }
 
@@ -123,12 +90,12 @@ export default function AdminDoctorsPage() {
         <Card className="shadow-sm">
           <CardContent className="p-6 flex flex-col gap-1">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">Max Capacity (Today)</span>
+              <span className="text-sm font-medium text-muted-foreground">Dr Slots (Today)</span>
               <IconUsers size={20} className="text-muted-foreground/50" />
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-heading font-bold">{stats.totalTokensToday}</span>
-              <span className="text-xs text-muted-foreground">Tokens</span>
+              <span className="text-3xl font-heading font-bold">{stats.shiftsToday}</span>
+              <span className="text-xs text-muted-foreground">slots</span>
             </div>
           </CardContent>
         </Card>
@@ -141,11 +108,11 @@ export default function AdminDoctorsPage() {
             <CardHeader className="pb-3 flex flex-row items-start justify-between">
               <div className="flex gap-3">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-heading font-bold border border-primary/20">
-                  {doc.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                  {doc.doctorName.split(' ').map(n => n[0]).join('').substring(0, 2)}
                 </div>
                 <div>
                   <CardTitle className="text-lg font-heading font-bold tracking-tight">
-                    {doc.name}
+                    {doc.doctorName}
                   </CardTitle>
                   <div className="text-sm text-primary font-medium mt-0.5">
                     {doc.specialization}
@@ -223,4 +190,50 @@ export default function AdminDoctorsPage() {
   );
 }
 
+export async function AdminDoctorLoader(): Promise<LoaderData> {
+  try {
+
+    // TODO: use Axios later
+    const apiOptions = {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include', // for cookie httpOnly
+    } as const;
+
+
+    const [doctorsRes, statsRes] = await Promise.all([
+      fetch("http://localhost:4040/api/v1/doctors", apiOptions),
+      fetch("http://localhost:4040/api/v1/doctors/stats", apiOptions)
+    ]);
+
+    if (!doctorsRes.ok) {
+      const err = await doctorsRes.json().catch(() => ({}));
+      throw new Error(err.message || "Failed to fetch doctors list.");
+    }
+
+    if (!statsRes.ok) {
+      const err = await statsRes.json().catch(() => ({}));
+      throw new Error(err.message || "Failed to fetch hospital stats.");
+    }
+    const doctorsData = await doctorsRes.json();
+    const statsData = await statsRes.json();
+
+    return {
+      doctors: doctorsData.data,
+      stats: statsData.data
+    };
+  }
+  catch (error) {
+    console.error("Loader Exception:", error instanceof Error ? error.message : "Unknown error");
+    // what is this Response it is native web api we are handeling the error the react router error boundry componenet 
+    throw new Response("Failed to load doctor data from server.", {
+      status: 500,
+      statusText: error instanceof Error ? error.message : "Internal Server Error"
+    });
+  }
+}
+
 // TODO: there should view doctor tansactions all transaction instead of view docotor Load
+// TODO: may be we can use name loader of adminDoctorLoader and while importing change this as 

@@ -8,8 +8,52 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import { IconStethoscope, IconDeviceFloppy } from "@tabler/icons-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { useRevalidator } from "react-router";
 
+// TODO: remove this any 
 export function OnboardDoctorSheet({ open, onOpenChange }: any) {
+
+  const revalidator = useRevalidator()
+  const [doctorName, setDoctorName] = useState<string>("");
+  const [specialization, setSpecialization] = useState<string>("");
+  const [isAvailable, setIsAvailable] = useState<string>("true");
+  const [isloading, setIsLoading] = useState(false);
+
+  const addDoctorHandler = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('http://localhost:4040/api/v1/doctors', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          doctorName: doctorName,
+          specialization: specialization,
+          isAvailable: isAvailable === "true"  // actually shadcn select doesnot handle so it is string you what this check do  
+        }),
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Invalid credentials");
+      }
+
+      const result = await response.json();
+      revalidator.revalidate()
+      onOpenChange(false);
+      toast.success(result.message || "sucesss")
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Something went wrong"
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-md flex flex-col h-full">
@@ -30,6 +74,8 @@ export function OnboardDoctorSheet({ open, onOpenChange }: any) {
               id="doctor-name"
               placeholder="e.g., Dr. Salman Ali"
               className="bg-muted/30"
+              value={doctorName}
+              onChange={(e) => setDoctorName(e.target.value)}
             />
           </div>
 
@@ -39,25 +85,28 @@ export function OnboardDoctorSheet({ open, onOpenChange }: any) {
               id="specialization"
               placeholder="e.g., Orthopedics, General Physician"
               className="bg-muted/30"
+              value={specialization}
+              onChange={(e) => setSpecialization(e.target.value)}
             />
           </div>
 
           <div className="grid gap-2">
             <Label>Initial Duty Status</Label>
-            <Select defaultValue="true">
+            <Select value={isAvailable} onValueChange={(value) => setIsAvailable(value)}>
               <SelectTrigger className="bg-muted/30">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="true">Available (Active in System)</SelectItem>
-                <SelectItem value="false">Off Duty (Hidden from Reception)</SelectItem>
+                <SelectItem value="false">Off Duty (Hidden from Reception)</SelectItem> {/* off duty will be hidden from Reception*/}
               </SelectContent>
             </Select>
           </div>
         </div>
 
         <SheetFooter className="mt-auto pt-4 border-t border-border/50">
-          <Button onClick={() => onOpenChange(false)} className="w-full gap-2 shadow-md">
+          <Button onClick={addDoctorHandler} className="w-full gap-2 shadow-md"
+            disabled={isloading}>
             <IconDeviceFloppy size={18} />
             Commit to Database
           </Button>

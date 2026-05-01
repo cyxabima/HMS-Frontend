@@ -8,8 +8,84 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import { IconClockHour4, IconPlus, IconTrash, IconReceipt2 } from "@tabler/icons-react";
+import { useState } from "react";
+import { useRevalidator } from "react-router";
+import { toast } from "sonner";
 
 export function ManageTimingsSheet({ doctor, open, onOpenChange }: any) {
+  // TODO: instead of multiple state maybe one state will be better contaning all these attributes
+  const [day, setDay] = useState<string>("");
+  const [startTime, setStartTime] = useState<string>("");
+  const [endTime, setEndTime] = useState<string>("");
+  const [avgConsultationTime, setAvgConsultationTime] = useState<number>(15);
+  const [maxTokens, setMaxTokens] = useState<number>(20);
+  const [consultationFee, setConsultationFee] = useState<number>();
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const revalidator = useRevalidator();
+
+  const addTimingHandler = async (doctorId: string) => {
+    // TODO: validate the input before calling 
+    setIsLoading(true);
+    try {
+      const response = await fetch(`http://localhost:4040/api/v1/doctors/${doctorId}/timing`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          day: day,
+          startTime: startTime,
+          endTime: endTime,
+          avgConsultationTime: avgConsultationTime,
+          maxTokens: maxTokens,
+          consultationFee: consultationFee,
+        }),
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Something went wrong");
+      }
+
+      const result = await response.json();
+      revalidator.revalidate()
+      toast.success(result.message || "sucesss")
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Something went wrong"
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  const deleteTiming = async (timingId: string) => {
+    try {
+      const response = await fetch(`http://localhost:4040/api/v1/doctors/timing/${timingId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Something went wrong");
+      }
+
+      const result = await response.json();
+      revalidator.revalidate()
+      toast.success(result.message || "sucesss")
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Something went wrong"
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   if (!doctor) return null;
 
   return (
@@ -33,7 +109,7 @@ export function ManageTimingsSheet({ doctor, open, onOpenChange }: any) {
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="grid gap-2 col-span-2">
                 <Label>Day of Week</Label>
-                <Select>
+                <Select value={day} onValueChange={(value) => setDay(value)}>
                   <SelectTrigger className="bg-background">
                     <SelectValue placeholder="Select day" />
                   </SelectTrigger>
@@ -47,31 +123,42 @@ export function ManageTimingsSheet({ doctor, open, onOpenChange }: any) {
 
               <div className="grid gap-2">
                 <Label>Start Time</Label>
-                <Input type="time" className="bg-background" />
+                <Input type="time" className="bg-background"
+                  value={startTime} onChange={(e) => setStartTime(e.target.value)} />
               </div>
               <div className="grid gap-2">
                 <Label>End Time</Label>
-                <Input type="time" className="bg-background" />
+                <Input type="time" className="bg-background"
+                  value={endTime} onChange={(e) => setEndTime(e.target.value)} />
               </div>
 
               <div className="grid gap-2">
                 <Label>Avg Consult (mins)</Label>
-                <Input type="number" defaultValue={15} className="bg-background" />
+                <Input type="number" defaultValue={15} className="bg-background"
+                  value={avgConsultationTime}
+                  onChange={(e) => setAvgConsultationTime(parseInt(e.target.value))} />
               </div>
               <div className="grid gap-2">
                 <Label>Max Tokens</Label>
-                <Input type="number" defaultValue={20} className="bg-background" />
+                <Input type="number" defaultValue={20} className="bg-background"
+                  value={maxTokens}
+                  onChange={(e) => setMaxTokens(parseInt(e.target.value))}
+                />
               </div>
 
               <div className="grid gap-2 col-span-2">
                 <Label className="text-primary flex items-center gap-1.5">
                   <IconReceipt2 size={14} /> Consultation Fee (Rs)
                 </Label>
-                <Input type="number" placeholder="e.g., 2000" className="bg-background border-primary/30" />
+                <Input type="number" placeholder="e.g., 2000" className="bg-background border-primary/30"
+                  value={consultationFee}
+                  onChange={(e) => setConsultationFee(parseInt(e.target.value))}
+                />
               </div>
             </div>
 
-            <Button variant="secondary" className="w-full text-xs font-bold uppercase tracking-wider">
+            <Button variant="secondary" className="w-full text-xs font-bold uppercase tracking-wider"
+              onClick={() => addTimingHandler(doctor.id)}>
               Issue Block to Schedule
             </Button>
           </div>
@@ -109,6 +196,7 @@ export function ManageTimingsSheet({ doctor, open, onOpenChange }: any) {
                     size="icon"
                     className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
                     title="Revoke Schedule Block"
+                    onClick={() => deleteTiming((timing.id))}
                   >
                     <IconTrash size={16} />
                   </Button>
